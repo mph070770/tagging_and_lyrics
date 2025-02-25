@@ -4,16 +4,17 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
 from .tagging import setup_tagging_service
 from .lyrics import setup_lyrics_service
-
+from .const import (
+    CONF_MEDIA_PLAYER,
+    CONF_ACCESS_KEY,
+    CONF_ACCESS_SECRET,
+    CONF_PORT,
+    CONF_HOST
+)
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "tagging_and_lyrics"
-CONF_MEDIA_PLAYER = "media_player"      
-CONF_ACCESS_KEY = "access_key"          
-CONF_ACCESS_SECRET = "access_secret"    
-CONF_PORT = "port"                      
-CONF_HOST = "host"                      
+DOMAIN = "tagging_and_lyrics"            
 
 CONFIG_SCHEMA = vol.Schema(
     {

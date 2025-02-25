@@ -1,0 +1,6 @@
+DOMAIN = "tagging_and_lyrics"
+CONF_MEDIA_PLAYER = "media_player"
+CONF_HOST = "host"
+CONF_PORT = "port"
+CONF_ACCESS_KEY = "access_key"
+CONF_ACCESS_SECRET = "access_secret"
