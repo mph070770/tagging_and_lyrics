@@ -5,6 +5,7 @@ from homeassistant.helpers import config_validation as cv
 from .tagging import setup_tagging_service
 from .lyrics import setup_lyrics_service
 from .const import (
+    DOMAIN,
     CONF_MEDIA_PLAYER,
     CONF_ACCESS_KEY,
     CONF_ACCESS_SECRET,
@@ -13,8 +14,6 @@ from .const import (
 )
 
 _LOGGER = logging.getLogger(__name__)
-
-DOMAIN = "tagging_and_lyrics"            
 
 CONFIG_SCHEMA = vol.Schema(
     {
@@ -31,19 +30,12 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-def setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up the Tagging and Lyrics integration."""
-    _LOGGER.info("Setting up the Tagging and Lyrics integration.")
+async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
+    """Set up the Tagging and Lyrics integration from a config entry."""
+    _LOGGER.info("Setting up the Tagging and Lyrics integration from config entry.")
 
-    conf = config[DOMAIN]
-    hass.data[DOMAIN] = {
-        CONF_MEDIA_PLAYER: conf[CONF_MEDIA_PLAYER],
-        CONF_PORT: conf[CONF_PORT],
-        CONF_HOST: conf[CONF_HOST],
-        CONF_ACCESS_KEY: conf[CONF_ACCESS_KEY],
-        CONF_ACCESS_SECRET: conf[CONF_ACCESS_SECRET]
-    }
-    
+    hass.data[DOMAIN] = config_entry.data
+
     # Register the tagging and lyrics services
     setup_tagging_service(hass)
     setup_lyrics_service(hass)
@@ -52,11 +44,11 @@ def setup(hass: HomeAssistant, config: dict) -> bool:
     logging.getLogger("custom_components.tagging_and_lyrics").setLevel(logging.DEBUG)
 
     # Autostart the fetch_lyrics service
-    def autostart(event):
+    async def autostart(event):
         _LOGGER.debug("Autostarting fetch_lyrics service.")
         try:
-            entity_id = "media_player.home_assistant_mic_093d58_media_player_2"  # Change to your media player ID
-            hass.services.call(
+            entity_id = config_entry.data[CONF_MEDIA_PLAYER]  # Use the configured media player
+            await hass.services.async_call(
                 "tagging_and_lyrics",
                 "fetch_lyrics",
                 {"entity_id": entity_id}
@@ -66,7 +58,7 @@ def setup(hass: HomeAssistant, config: dict) -> bool:
             _LOGGER.error("Error in autostarting fetch_lyrics service: %s", e)
 
     # Listen for Home Assistant start event
-    hass.bus.listen_once("homeassistant_start", autostart)
+    hass.bus.async_listen_once("homeassistant_start", autostart)
     _LOGGER.debug("Registered autostart listener for homeassistant_start.")
 
     return True
