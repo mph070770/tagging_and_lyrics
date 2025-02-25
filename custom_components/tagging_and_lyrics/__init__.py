@@ -2,8 +2,8 @@ import logging
 import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import config_validation as cv
-from .tagging import setup_tagging_service
-from .lyrics import setup_lyrics_service
+from .tagging import async_setup_tagging_service
+from .lyrics import async_setup_lyrics_service
 from .const import (
     DOMAIN,
     CONF_MEDIA_PLAYER,
@@ -38,7 +38,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
 
     # Register the tagging and lyrics services asynchronously
     await async_setup_tagging_service(hass)
-    setup_lyrics_service(hass)
+    await async_setup_lyrics_service(hass)
 
     # Ensure logging level is set to debug for troubleshooting
     logging.getLogger("custom_components.tagging_and_lyrics").setLevel(logging.DEBUG)

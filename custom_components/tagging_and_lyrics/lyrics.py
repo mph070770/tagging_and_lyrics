@@ -428,7 +428,7 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
     #    _LOGGER.info("Media player is not playing. Waiting for state change.")
 
 
-async def setup_lyrics_service(hass: HomeAssistant):
+async def async_setup_lyrics_service(hass: HomeAssistant):
     """Register the fetch_lyrics service."""
     _LOGGER.debug("Registering the fetch_lyrics service.")
 
