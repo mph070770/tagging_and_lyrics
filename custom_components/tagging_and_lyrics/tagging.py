@@ -121,7 +121,11 @@ class TaggingService:
 
                 # Short summary for sensor (title, artist, playtime)
                 summary = f"{title} - {artist_name} ({play_time})"
-                await self.hass.states.async_set("sensor.tagging_result", summary)
+                if self.hass:
+                    await self.hass.states.async_set("sensor.tagging_result", summary)
+                else:
+                    _LOGGER.error("Home Assistant instance is None. Cannot set state.") #MH - not sure about this as the fix??
+
 
                 # Full response stored in a persistent notification
                 self.hass.services.call(
