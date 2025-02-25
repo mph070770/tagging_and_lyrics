@@ -75,7 +75,7 @@ class TaggingService:
 
             data, addr = self.sock.recvfrom(CHUNK_SIZE)
             _LOGGER.info("Audio detected, starting recording for %d seconds...", duration)
-            update_lyrics_input_text(self.hass, "Listening......", "", "")
+            await update_lyrics_input_text(self.hass, "Listening......", "", "")
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
 
             start_time = time.time()
@@ -89,7 +89,9 @@ class TaggingService:
 
             # Convert buffer to WAV file
             wav_filename = "recorded_audio.wav"
-            with wave.open(wav_filename, "wb") as wf:
+            #with wave.open(wav_filename, "wb") as wf:
+            wf = await asyncio.to_thread(wave.open, wav_filename, "wb")
+            with wf:
                 wf.setnchannels(CHANNELS)
                 wf.setsampwidth(SAMPLE_WIDTH)
                 wf.setframerate(SAMPLE_RATE)
@@ -101,7 +103,7 @@ class TaggingService:
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
             response = self.recognizer.recognize_by_file(wav_filename, 0, 10)
-            update_lyrics_input_text(self.hass, "Matching......", "", "")
+            await update_lyrics_input_text(self.hass, "Matching......", "", "")
             _LOGGER.info("ACRCloud Response: %s", response)
 
             # Parse JSON response
@@ -118,7 +120,7 @@ class TaggingService:
 
                 # Short summary for sensor (title, artist, playtime)
                 summary = f"{title} - {artist_name} ({play_time})"
-                self.hass.states.set("sensor.tagging_result", summary)
+                await self.hass.states.async_set("sensor.tagging_result", summary)
 
                 # Full response stored in a persistent notification
                 self.hass.services.call(
@@ -136,9 +138,9 @@ class TaggingService:
 
             else:
                 message = "No music recognized."
-                self.hass.states.set("sensor.tagging_result", "No match")
+                await self.hass.states.async_set("sensor.tagging_result", "No match")
 
-            update_lyrics_input_text(self.hass, "", "", "")
+            await update_lyrics_input_text(self.hass, "", "", "")
 
             # Create a persistent notification with the formatted response
             self.hass.services.call(
@@ -162,7 +164,7 @@ class TaggingService:
         except Exception as e:
             _LOGGER.error("Error in Tagging Service: %s", e)
             # Ensure switch is turned off in case of an error
-            self.hass.states.set("switch.tag_enable", "off")
+            await self.hass.states.async_set("switch.tag_enable", "off")
 
 
     def stop(self):
