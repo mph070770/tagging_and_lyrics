@@ -30,12 +30,19 @@ CONFIG_SCHEMA = vol.Schema(
     extra=vol.ALLOW_EXTRA,
 )
 
-async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
-    """Set up the Tagging and Lyrics integration from a config entry."""
-    _LOGGER.info("Setting up the Tagging and Lyrics integration from config entry.")
+def setup(hass: HomeAssistant, config: dict) -> bool:
+    """Set up the Tagging and Lyrics integration."""
+    _LOGGER.info("Setting up the Tagging and Lyrics integration.")
 
-    hass.data[DOMAIN] = config_entry.data
-
+    conf = config[DOMAIN]
+    hass.data[DOMAIN] = {
+        CONF_MEDIA_PLAYER: conf[CONF_MEDIA_PLAYER],
+        CONF_PORT: conf[CONF_PORT],
+        CONF_HOST: conf[CONF_HOST],
+        CONF_ACCESS_KEY: conf[CONF_ACCESS_KEY],
+        CONF_ACCESS_SECRET: conf[CONF_ACCESS_SECRET]
+    }
+    
     # Register the tagging and lyrics services
     setup_tagging_service(hass)
     setup_lyrics_service(hass)
@@ -44,11 +51,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
     logging.getLogger("custom_components.tagging_and_lyrics").setLevel(logging.DEBUG)
 
     # Autostart the fetch_lyrics service
-    async def autostart(event):
+    def autostart(event):
         _LOGGER.debug("Autostarting fetch_lyrics service.")
         try:
-            entity_id = config_entry.data[CONF_MEDIA_PLAYER]  # Use the configured media player
-            await hass.services.async_call(
+            entity_id = "media_player.home_assistant_mic_093d58_media_player_2"  # Change to your media player ID
+            hass.services.call(
                 "tagging_and_lyrics",
                 "fetch_lyrics",
                 {"entity_id": entity_id}
@@ -58,7 +65,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry) -> bool:
             _LOGGER.error("Error in autostarting fetch_lyrics service: %s", e)
 
     # Listen for Home Assistant start event
-    hass.bus.async_listen_once("homeassistant_start", autostart)
+    hass.bus.listen_once("homeassistant_start", autostart)
     _LOGGER.debug("Registered autostart listener for homeassistant_start.")
 
     return True
