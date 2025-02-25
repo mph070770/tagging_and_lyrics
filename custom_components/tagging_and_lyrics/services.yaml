@@ -1,0 +1,13 @@
+fetch_audio_tag:
+  description: "Recognize audio from a UDP stream and tag it."
+  fields:
+    duration:
+      description: "Recording duration in seconds."
+      example: 10
+
+fetch_lyrics:
+  description: "Fetch lyrics for the currently playing track."
+  fields:
+    entity_id:
+      description: "The media player entity to fetch lyrics for."
+      example: "media_player.music_room_speaker_media_player_2"
