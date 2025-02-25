@@ -432,10 +432,14 @@ async def async_setup_lyrics_service(hass: HomeAssistant):
     """Register the fetch_lyrics service."""
     _LOGGER.debug("Registering the fetch_lyrics service.")
 
+    async def async_wrapper(call):
+        await handle_fetch_lyrics(hass, call)
+
     hass.services.async_register(
         "tagging_and_lyrics",
         "fetch_lyrics",
-        lambda call: handle_fetch_lyrics(hass, call),
+        async_wrapper,
         schema=SERVICE_FETCH_LYRICS_SCHEMA
     )
+
     _LOGGER.info("fetch_lyrics service registered successfully.")

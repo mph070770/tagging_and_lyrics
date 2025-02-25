@@ -195,10 +195,13 @@ async def async_setup_tagging_service(hass: HomeAssistant):
     """Register the fetch_audio_tag service in Home Assistant."""
     _LOGGER.info("Registering the fetch_audio_tag service.")
 
+    async def async_wrapper(call):
+        await handle_fetch_audio_tag(hass, call)
+
     hass.services.async_register(
         "tagging_and_lyrics",
         "fetch_audio_tag",
-        lambda call: handle_fetch_audio_tag(hass, call),
+        async_wrapper,
         schema=SERVICE_FETCH_AUDIO_TAG_SCHEMA
     )
 
