@@ -102,7 +102,8 @@ class TaggingService:
 
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
-            response = self.recognizer.recognize_by_file(wav_filename, 0, 10)
+            #response = self.recognizer.recognize_by_file(wav_filename, 0, 10)
+            response = await asyncio.to_thread(self.recognizer.recognize_by_file, wav_filename, 0, 10)
             await update_lyrics_input_text(self.hass, "Matching......", "", "")
             _LOGGER.info("ACRCloud Response: %s", response)
 
