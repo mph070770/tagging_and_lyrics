@@ -6,6 +6,7 @@ from homeassistant.helpers import config_validation as cv
 import lrc_kit
 import time
 import re
+import asyncio
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,11 +72,11 @@ def calculate_media_timecode(pos, updated):
     elapsed_time = (current_time - last_update_time).total_seconds()
     return round(pos + elapsed_time, 2)
 
-def update_lyrics_input_text(hass: HomeAssistant, previous_line: str, current_line: str, next_line: str):
+async def update_lyrics_input_text(hass: HomeAssistant, previous_line: str, current_line: str, next_line: str):
     """Update the input_text entities with the current lyrics lines."""
-    hass.services.call("input_text", "set_value", {"entity_id": "input_text.line1", "value": previous_line})
-    hass.services.call("input_text", "set_value", {"entity_id": "input_text.line2", "value": current_line})
-    hass.services.call("input_text", "set_value", {"entity_id": "input_text.line3", "value": next_line})
+    await hass.services.async_call("input_text", "set_value", {"entity_id": "input_text.line1", "value": previous_line})
+    await hass.services.async_call("input_text", "set_value", {"entity_id": "input_text.line2", "value": current_line})
+    await hass.services.async_call("input_text", "set_value", {"entity_id": "input_text.line3", "value": next_line})
 
 def clean_track_name(track):
     """Clean up the track name by removing unwanted text, special characters, and comments."""
@@ -151,7 +152,7 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
 
     return track, artist, pos, updated_at
 
-def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, updated_at, entity_id, audiofingerprint):
+async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, updated_at, entity_id, audiofingerprint):
     """Fetch lyrics for a given track and synchronize with playback."""
     global ACTIVE_LYRICS_LOOP  
 
@@ -193,7 +194,7 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
    #     return
 
     _LOGGER.info("Start new session")
-    update_lyrics_input_text(hass, "", "", "")
+    await update_lyrics_input_text(hass, "", "", "")
     # Start new session
     ACTIVE_LYRICS_LOOP = True
     timeline = []
@@ -211,7 +212,7 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
     if not lyrics_result:
         _LOGGER.warning("No lyrics found for '%s'.", track)
         #update_lyrics_input_text(hass, "No lyrics found", "", "")
-        update_lyrics_input_text(hass, "", "", "")
+        await update_lyrics_input_text(hass, "", "", "")
         return
 
     _LOGGER.warning("Processing lyrics into timeline")
@@ -219,7 +220,7 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
 
     if not timeline:
         _LOGGER.error("Lyrics have no timeline.")
-        update_lyrics_input_text(hass, "Lyrics not synced", "", "")
+        await update_lyrics_input_text(hass, "Lyrics not synced", "", "")
         return
 
     _LOGGER.warning("Synchronizing lyrics")
@@ -243,11 +244,12 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
         # Check if media player is paused
         if player_state == "paused":
             _LOGGER.info("Media player paused. Clearing lyrics display.")
-            update_lyrics_input_text(hass, "", "", "")
+            await update_lyrics_input_text(hass, "", "", "")
 
             pause_start = datetime.datetime.now(datetime.timezone.utc)
             while hass.states.get(entity_id).state == "paused":
-                time.sleep(1)
+                #time.sleep(1)
+                await asyncio.sleep(1)
 
             pause_end = datetime.datetime.now(datetime.timezone.utc)
             pause_duration = (pause_end - pause_start).total_seconds()
@@ -291,7 +293,7 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
 
         if media_timecode * 1000 >= timeline[-1]:  # Exit if lyrics finished
             _LOGGER.info("Lyrics finished, exiting loop.")
-            update_lyrics_input_text(hass, "", "", "")
+            await update_lyrics_input_text(hass, "", "", "")
             break
 
         # Display synchronized lyrics
@@ -302,7 +304,7 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
                     current_line = lrc[n - 1]
                     next_line = lrc[n] if n < len(lrc) else ""
 
-                    update_lyrics_input_text(hass, previous_line, current_line, next_line)
+                    await update_lyrics_input_text(hass, previous_line, current_line, next_line)
 
                     sleep_time = (timeline[n] - media_timecode * 1000) / 1000.0
                     total_sleep = max(0.1, sleep_time)  # Ensure minimum sleep time
@@ -311,10 +313,11 @@ def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, up
                     while total_sleep > 0:
                         if not ACTIVE_LYRICS_LOOP:  # Check if loop should exit
                             _LOGGER.info("Lyrics loop interrupted, exiting sleep.")
-                            update_lyrics_input_text(hass, "", "", "")
+                            await update_lyrics_input_text(hass, "", "", "")
                             break  # Exit the async function immediately
                         
-                        time.sleep(min(interval, total_sleep))  # Sleep for interval or remaining time
+                        #time.sleep(min(interval, total_sleep))  # Sleep for interval or remaining time
+                        await asyncio.sleep(min(0.1, total_sleep))
                         total_sleep -= interval  # Reduce remaining sleep time
 
     #get more lyrics if the mediaplayer is continuing (but not when it's streaming radio...)
@@ -425,11 +428,11 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
     #    _LOGGER.info("Media player is not playing. Waiting for state change.")
 
 
-def setup_lyrics_service(hass: HomeAssistant):
+async def setup_lyrics_service(hass: HomeAssistant):
     """Register the fetch_lyrics service."""
     _LOGGER.debug("Registering the fetch_lyrics service.")
 
-    hass.services.register(
+    hass.services.async_register(
         "tagging_and_lyrics",
         "fetch_lyrics",
         lambda call: handle_fetch_lyrics(hass, call),

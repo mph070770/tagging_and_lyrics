@@ -7,6 +7,7 @@ import re
 import wave
 import threading
 import voluptuous as vol
+import asyncio
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.entity_registry import async_get
@@ -65,12 +66,12 @@ class TaggingService:
         }
         self.recognizer = ACRCloudRecognizer(self.config)
 
-    def listen_for_audio(self, duration):
+    async def listen_for_audio(self, duration):
         """Listen for UDP audio data for the specified duration."""
         try:
             _LOGGER.info("Waiting for incoming UDP audio data...")
 
-            self.hass.services.call("switch", "turn_on", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
+            await self.hass.services.async_call("switch", "turn_on", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
 
             data, addr = self.sock.recvfrom(CHUNK_SIZE)
             _LOGGER.info("Audio detected, starting recording for %d seconds...", duration)
@@ -95,7 +96,7 @@ class TaggingService:
                 wf.writeframes(b"".join(buffer))
 
             # Disable the tagging switch after WAV file creation
-            self.hass.services.call("switch", "turn_off", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
+            await self.hass.services.async_call("switch", "turn_off", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
 
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
@@ -170,7 +171,7 @@ class TaggingService:
         self.sock.close()
 
 
-def handle_fetch_audio_tag(hass: HomeAssistant, call: ServiceCall):
+async def handle_fetch_audio_tag(hass: HomeAssistant, call: ServiceCall):
     """Handle the service call for fetching audio tags."""
     duration = call.data.get("duration", 10)
 
@@ -184,15 +185,17 @@ def handle_fetch_audio_tag(hass: HomeAssistant, call: ServiceCall):
     tagging_service = TaggingService(hass)
     hass.data["tagging_service"] = tagging_service  # Store the instance
 
-    thread = threading.Thread(target=tagging_service.listen_for_audio, args=(duration,), daemon=True)
-    thread.start()
+    #thread = threading.Thread(target=tagging_service.listen_for_audio, args=(duration,), daemon=True)
+    #thread.start()
+
+    await tagging_service.listen_for_audio(duration)
 
 
-def setup_tagging_service(hass: HomeAssistant):
+async def async_setup_tagging_service(hass: HomeAssistant):
     """Register the fetch_audio_tag service in Home Assistant."""
     _LOGGER.info("Registering the fetch_audio_tag service.")
 
-    hass.services.register(
+    hass.services.async_register(
         "tagging_and_lyrics",
         "fetch_audio_tag",
         lambda call: handle_fetch_audio_tag(hass, call),
