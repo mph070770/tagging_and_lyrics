@@ -118,7 +118,11 @@ def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, play_off
      # Get the configured media player entity ID
     media_player = hass.data["tagging_and_lyrics"]["media_player"]
 
-    await fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
+    #fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
+
+    hass.async_create_task(
+        fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True)
+    )
 
 def get_media_player_info(hass: HomeAssistant, entity_id: str):
     """Retrieve track, artist, media position, and last update time from media player."""
@@ -396,7 +400,8 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
                     _LOGGER.debug("Fetching>>>>>>>>>>")
                     LAST_MEDIA_CONTENT_ID = media_content_id
                     #fetch_lyrics_for_track(hass, track, artist, pos, updated_at, entity, False)
-                    await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False) #Pos wasn't updated at the same time as media_content_id??
+                    #await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False) #Pos wasn't updated at the same time as media_content_id??
+                    hass.async_create_task(fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False))
             else:
                 _LOGGER.info("Track already processed. Skipping lyrics fetch.")
         else:
