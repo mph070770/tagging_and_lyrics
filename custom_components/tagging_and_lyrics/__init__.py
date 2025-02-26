@@ -24,13 +24,13 @@ CONFIG_SCHEMA = vol.Schema(
             vol.Required(CONF_ACCESS_SECRET): cv.string,
             vol.Optional(CONF_PORT, default=6056): vol.All(vol.Coerce(int), vol.Range(min=1, max=65535)),
             vol.Optional(CONF_MEDIA_PLAYER): cv.entity_id,
-            vol.Optional(CONF_LYRICS_ENABLE, default=False): cv.boolean,
+            vol.Optional(CONF_LYRICS_ENABLE, default=True): cv.boolean,
         })
     },
     extra=vol.ALLOW_EXTRA,
 )
 
-async def async_setup(hass: HomeAssistant, config: vol.config_type) -> bool:
+async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the component."""
     # Store the config in hass.data
     conf = config[DOMAIN]
