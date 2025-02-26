@@ -110,6 +110,9 @@ class TaggingService:
         #return self.recognizer.recognize_by_file(filename, 0, 10)
         return await asyncio.to_thread(self.recognizer.recognize_by_file, filename, 0, 10)
 
+    def _set_state_in_loop(self, entity_id, state):
+        """Set state in the Home Assistant event loop."""
+        self.hass.states.async_set(entity_id, state)
 
     async def listen_for_audio(self, duration):
         """Listen for UDP audio data for the specified duration."""
@@ -138,9 +141,11 @@ class TaggingService:
                 _LOGGER.info("ACRCloud Response: %s", response)
             except Exception as e:
                 _LOGGER.error("Error in Tagging Service: %s", e)
-                self.hass.states.async_set("sensor.tagging_result", "No match")
+                #self.hass.states.async_set("sensor.tagging_result", "No match")
+                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", "No match")
             finally:
-                self.hass.states.async_set("switch.tag_enable", "off") #Needed??
+                #self.hass.states.async_set("switch.tag_enable", "off") #Needed??
+                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "switch.tag_enable", "off")
 
             # Parse JSON response
             response_data = json.loads(response)
@@ -155,11 +160,12 @@ class TaggingService:
 
                 # Short summary for sensor (title, artist, playtime)
                 summary = f"{title} - {artist_name} ({play_time})"
-                self.hass.states.async_set("sensor.tagging_result", summary)
+                #self.hass.states.async_set("sensor.tagging_result", summary)
+                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", summary)
 
 
                 # Full response stored in a persistent notification
-                self.hass.services.async_call(
+                await self.hass.services.async_call(
                     "persistent_notification",
                     "create",
                     {
@@ -174,7 +180,8 @@ class TaggingService:
 
             else:
                 message = "No music recognized."
-                self.hass.states.async_set("sensor.tagging_result", "No match")
+                #self.hass.states.async_set("sensor.tagging_result", "No match")
+                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", "No match")
 
             await update_lyrics_input_text(self.hass, "", "", "")
 
@@ -200,7 +207,8 @@ class TaggingService:
         except Exception as e:
             _LOGGER.error("Error in Tagging Service: %s", e)
             # Ensure switch is turned off in case of an error
-            self.hass.states.async_set("switch.tag_enable", "off")
+            #self.hass.states.async_set("switch.tag_enable", "off")
+            self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "switch.tag_enable", "off")
 
     def stop(self):
         """Stop the tagging service."""
