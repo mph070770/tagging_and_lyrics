@@ -61,6 +61,7 @@ class TaggingService:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)  # Allow reuse
         self.sock.bind(("0.0.0.0", conf["port"]))
+        self.sock.setblocking(False)  # Set to non-blocking
         self.running = True
 
         self.config = {
@@ -77,24 +78,23 @@ class TaggingService:
         """Non-blocking UDP data reception using asyncio."""
         loop = asyncio.get_running_loop()
         data_buffer = []
-
-        def socket_recv():
-            try:
-                return self.sock.recvfrom(CHUNK_SIZE)
-            except Exception as e:
-                _LOGGER.error("Socket error: %s", e)
-                return None, None
-
+        
         start_time = time.time()
         while time.time() - start_time < duration:
-            data, addr = await asyncio.to_thread(socket_recv)
-            if data:
+            try:
+                data, addr = await loop.sock_recvfrom(self.sock, CHUNK_SIZE)
                 data_buffer.append(data)
+            except BlockingIOError:
+                pass  # No data available yet, continue
+            except Exception as e:
+                _LOGGER.error(f"Error receiving data: {e}")
+                break
             await asyncio.sleep(0.01)  # Yield control to the event loop
 
         return data_buffer
     
-    def write_audio_file(self, filename, frames):
+    async def write_audio_file(self, filename, frames):
+        """Write audio data to a WAV file in a non-blocking way."""
         with wave.open(filename, "wb") as wf:
             wf.setnchannels(CHANNELS)
             wf.setsampwidth(SAMPLE_WIDTH)
@@ -114,57 +114,29 @@ class TaggingService:
 
             await self.hass.services.async_call("switch", "turn_on", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
     
-            #data, addr = self.sock.recvfrom(CHUNK_SIZE)
-
             buffer = await self.receive_udp_data(duration)
 
             _LOGGER.info("Audio detected, starting recording for %d seconds...", duration)
             
             await update_lyrics_input_text(self.hass, "Listening......", "", "")
-            #process_begin = datetime.datetime.now(datetime.timezone.utc)
-
-            #start_time = time.time()
-            #buffer = []
-
-            #while time.time() - start_time < duration:
-            #    buffer.append(data)
-            #    data, addr = self.sock.recvfrom(CHUNK_SIZE)
-
-            
 
             # Convert buffer to WAV file
             wav_filename = "recorded_audio.wav"
             await asyncio.to_thread(self.write_audio_file, wav_filename, buffer)
             _LOGGER.info("Recording complete. Sending to ACRCloud...")
-            #with wave.open(wav_filename, "wb") as wf:
-            #wf = await asyncio.to_thread(wave.open, wav_filename, "wb")
-            #with wf:
-            #    wf.setnchannels(CHANNELS)
-            #    wf.setsampwidth(SAMPLE_WIDTH)
-            #    wf.setframerate(SAMPLE_RATE)
-            #    wf.writeframes(b"".join(buffer))
+           
 
             # Disable the tagging switch after WAV file creation
             await self.hass.services.async_call("switch", "turn_off", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
 
             try:
-                #response = await asyncio.to_thread(self.recognize_audio, wav_filename)
                 response = await self.recognize_audio(wav_filename)
                 _LOGGER.info("ACRCloud Response: %s", response)
-                #summary = self.parse_acrcloud_response(response)
-                #self.hass.states.set("sensor.tagging_result", summary)
             except Exception as e:
                 _LOGGER.error("Error in Tagging Service: %s", e)
-                await asyncio.to_thread(self.hass.states.set("sensor.tagging_result", "No match"))
+                await self.hass.states.async_set("sensor.tagging_result", "No match")
             finally:
-                await asyncio.to_thread(self.hass.states.set("switch.tag_enable", "off")) #Needed??
-
-            # Send to ACRCloud
-            #process_begin = datetime.datetime.now(datetime.timezone.utc)
-            #response = self.recognizer.recognize_by_file(wav_filename, 0, 10)
-            #response = await asyncio.to_thread(self.recognizer.recognize_by_file, wav_filename, 0, 10)
-            #await update_lyrics_input_text(self.hass, "Matching......", "", "")
-            #_LOGGER.info("ACRCloud Response: %s", response)
+                await self.hass.states.async_set("switch.tag_enable", "off") #Needed??
 
             # Parse JSON response
             response_data = json.loads(response)
@@ -179,15 +151,11 @@ class TaggingService:
 
                 # Short summary for sensor (title, artist, playtime)
                 summary = f"{title} - {artist_name} ({play_time})"
-                self.hass.states.async_set("sensor.tagging_result", summary)
-                #if self.hass:
-                #    await self.hass.states.async_set("sensor.tagging_result", summary)
-                #else:
-                #    _LOGGER.error("Home Assistant instance is None. Cannot set state.") #MH - not sure about this as the fix??
+                await self.hass.states.async_set("sensor.tagging_result", summary)
 
 
                 # Full response stored in a persistent notification
-                self.hass.services.call(
+                self.hass.services.async_call(
                     "persistent_notification",
                     "create",
                     {
@@ -202,16 +170,12 @@ class TaggingService:
 
             else:
                 message = "No music recognized."
-                self.hass.states.async_set("sensor.tagging_result", "No match")
-                #if self.hass:
-                #    await self.hass.states.async_set("sensor.tagging_result", "No match")
-                #else:
-                #    _LOGGER.error("Home Assistant instance is None. Cannot set state.")
+                await self.hass.states.async_set("sensor.tagging_result", "No match")
 
             await update_lyrics_input_text(self.hass, "", "", "")
 
             # Create a persistent notification with the formatted response
-            self.hass.services.call(
+            await self.hass.services.async_call(
                 "persistent_notification",
                 "create",
                 {
@@ -232,11 +196,7 @@ class TaggingService:
         except Exception as e:
             _LOGGER.error("Error in Tagging Service: %s", e)
             # Ensure switch is turned off in case of an error
-            self.hass.states.async_set("switch.tag_enable", "off")
-            #if self.hass:
-            #    await self.hass.states.async_set("switch.tag_enable", "off")
-            #else:
-            #    _LOGGER.error("Home Assistant instance is None. Cannot set state.")
+            await self.hass.states.async_set("switch.tag_enable", "off")
 
     def stop(self):
         """Stop the tagging service."""
@@ -257,9 +217,6 @@ async def handle_fetch_audio_tag(hass: HomeAssistant, call: ServiceCall):
 
     tagging_service = TaggingService(hass)
     hass.data["tagging_service"] = tagging_service  # Store the instance
-
-    #thread = threading.Thread(target=tagging_service.listen_for_audio, args=(duration,), daemon=True)
-    #thread.start()
 
     await tagging_service.listen_for_audio(duration)
 
