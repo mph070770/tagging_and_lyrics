@@ -136,12 +136,14 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
     
     if not player_state:
         _LOGGER.error("Media player entity not found.")
-        await update_lyrics_input_text(hass, "Media player entity not found", "", "")
+        #await update_lyrics_input_text(hass, "Media player entity not found", "", "")
+        hass.async_create_task(update_lyrics_input_text(hass, "Media player entity not found", "", ""))
         return None, None, None, None  # Return empty values
 
     if player_state.state != "playing":
         _LOGGER.info("Media player is not playing. Waiting...")
-        await update_lyrics_input_text(hass, "Waiting for playback to start", "", "")
+        #await update_lyrics_input_text(hass, "Waiting for playback to start", "", "")
+        hass.async_create_task(update_lyrics_input_text(hass, "Waiting for playback to start", "", ""))
         return None, None, None, None
 
     track = clean_track_name(player_state.attributes.get("media_title", ""))
@@ -151,7 +153,8 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
 
     if not track or not artist:
         _LOGGER.warning("Missing track or artist information.")
-        await update_lyrics_input_text(hass, "Missing track or artist", "", "")
+        #await update_lyrics_input_text(hass, "Missing track or artist", "", "")
+        hass.async_create_task(update_lyrics_input_text(hass, "Missing track or artist", "", ""))
         return None, None, None, None
 
     return track, artist, pos, updated_at
