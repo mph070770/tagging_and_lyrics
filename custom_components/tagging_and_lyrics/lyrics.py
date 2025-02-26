@@ -360,7 +360,7 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
             # Start new lyrics fetch for the new track
      #       fetch_lyrics_for_track(hass, new_title, new_artist, new_pos, new_updated_at, entity_id)
 
-def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
+async def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
     """Main service handler: gets media info and fetches lyrics."""
     entity_id = call.data.get("entity_id")
     
