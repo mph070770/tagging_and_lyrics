@@ -49,6 +49,12 @@ class TaggingService:
     """Service to listen for UDP audio samples and process them."""
     def __init__(self, hass: HomeAssistant):
         self.hass = hass
+
+        if self.hass:
+            _LOGGER.debug("TaggingService initialized with hass.")
+        else:
+            _LOGGER.error("TaggingService initialized WITHOUT hass.")
+
         conf = hass.data["tagging_and_lyrics"]
 
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -143,7 +149,11 @@ class TaggingService:
 
             else:
                 message = "No music recognized."
-                await self.hass.states.async_set("sensor.tagging_result", "No match")
+                #await self.hass.states.async_set("sensor.tagging_result", "No match")
+                if self.hass:
+                    await self.hass.states.async_set("sensor.tagging_result", "No match")
+                else:
+                    _LOGGER.error("Home Assistant instance is None. Cannot set state.")
 
             await update_lyrics_input_text(self.hass, "", "", "")
 
@@ -169,8 +179,11 @@ class TaggingService:
         except Exception as e:
             _LOGGER.error("Error in Tagging Service: %s", e)
             # Ensure switch is turned off in case of an error
-            await self.hass.states.async_set("switch.tag_enable", "off")
-
+            #await self.hass.states.async_set("switch.tag_enable", "off")
+            if self.hass:
+                await self.hass.states.async_set("switch.tag_enable", "off")
+            else:
+                _LOGGER.error("Home Assistant instance is None. Cannot set state.")
 
     def stop(self):
         """Stop the tagging service."""
