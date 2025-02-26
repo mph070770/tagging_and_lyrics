@@ -411,18 +411,18 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
                     hass.loop.call_soon_threadsafe(hass.async_create_task, fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False))
             else:
                 _LOGGER.info("Track already processed. Skipping lyrics fetch.")
-        else:
-            if new_state.state=="playing" and media_content_id:
-                LAST_MEDIA_CONTENT_ID = media_content_id #it's a radio station so capture the change of stream but don't fetch lyrics
-            if ACTIVE_LYRICS_LOOP is not None:
-                _LOGGER.info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ACTIVE_LYRICS_LOOP = %s", ACTIVE_LYRICS_LOOP)
-            else:
-                _LOGGER.info("-----------------------------------------------------------------------None")
+        #Playing, radio
+        elif new_state.state=="playing" and media_content_id.startswith("library://radio"):
+            LAST_MEDIA_CONTENT_ID = media_content_id #it's a radio station so capture the change of stream but don't fetch lyrics
+            _LOGGER.info("Radio station detected")
             ACTIVE_LYRICS_LOOP = None
+            await update_lyrics_input_text(hass, "", "", "")
+        else:
+            #not playing
             if ACTIVE_LYRICS_LOOP is not None:
-                _LOGGER.info("+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ACTIVE_LYRICS_LOOP = %s", ACTIVE_LYRICS_LOOP)
-            else:
-                _LOGGER.info("-----------------------------------------------------------------------None")
+                _LOGGER.info("Lyrics stopped (media player is not playing)")
+                await update_lyrics_input_text(hass, "", "", "")
+            ACTIVE_LYRICS_LOOP = None
 
 
     # Register listener for state changes
