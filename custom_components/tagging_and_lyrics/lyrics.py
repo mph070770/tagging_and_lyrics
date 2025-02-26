@@ -129,11 +129,11 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
     """Retrieve track, artist, media position, and last update time from media player."""
     player_state = hass.states.get(entity_id)
 
-    _LOGGER.info("mediaID: %s", player_state.attributes.get("media_content_id"))
-    _LOGGER.info("playerState: %s", player_state)
-    _LOGGER.info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
-    _LOGGER.info("Attributes: %s", player_state.attributes)
-    _LOGGER.info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    #_LOGGER.info("mediaID: %s", player_state.attributes.get("media_content_id"))
+    #_LOGGER.info("playerState: %s", player_state)
+    #_LOGGER.info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
+    #_LOGGER.info("Attributes: %s", player_state.attributes)
+    #_LOGGER.info("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
     
     if not player_state:
         _LOGGER.error("Media player entity not found.")
@@ -360,7 +360,7 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
     global ACTIVE_LYRICS_LOOP
     if ACTIVE_LYRICS_LOOP:
         _LOGGER.warning("Stopping current lyrics session for new request.")
-        ACTIVE_LYRICS_LOOP = False
+        ACTIVE_LYRICS_LOOP = None
 
     async def monitor_playback(entity, old_state, new_state):
         """Monitor media player state changes."""
@@ -393,8 +393,8 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
 
             # Check if the media_content_id is different from the last one processed
             if media_content_id and media_content_id != LAST_MEDIA_CONTENT_ID:
-                _LOGGER.info("ACTIVE_LYRICS_LOOP = False")
-                ACTIVE_LYRICS_LOOP = False
+                _LOGGER.info("ACTIVE_LYRICS_LOOP = **None**")
+                ACTIVE_LYRICS_LOOP = None # changed from False
                 _LOGGER.info("New media detected. Fetching lyrics.")
                 await update_lyrics_input_text(hass, "", "", "")
                 track, artist, pos, updated_at = get_media_player_info(hass, entity)
