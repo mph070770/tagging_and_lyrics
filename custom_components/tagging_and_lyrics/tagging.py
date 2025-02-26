@@ -238,7 +238,7 @@ async def async_setup_tagging_service(hass: HomeAssistant):
 
     # Inside TaggingService.listen_for_audio() after successful tagging:
     conf = hass.data["tagging_and_lyrics"]
-    if conf.get(CONF_LYRICS_ENABLE, False):
+    if conf.get(CONF_LYRICS_ENABLE, True):
         _LOGGER.info("Lyrics lookup enabled. Setting up lyrics lookup trigger.")
         async def tagging_service_lyrics_call(title, artist, play_offset_ms):
             process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
@@ -247,6 +247,12 @@ async def async_setup_tagging_service(hass: HomeAssistant):
         hass.data['tagging_service_lyrics_call'] = tagging_service_lyrics_call
     else:
         _LOGGER.info("Lyrics lookup disabled.")
+    
+    return True
+    
+async def async_setup_entry(hass, entry):
+    _LOGGER.info("async setup entry: %s", entry)
+    """Set up platform from a ConfigEntry."""
 
     async def async_wrapper(call):
         await handle_fetch_audio_tag(hass, call)
@@ -259,3 +265,5 @@ async def async_setup_tagging_service(hass: HomeAssistant):
     )
 
     _LOGGER.info("fetch_audio_tag service registered successfully.")
+    return True
+
