@@ -37,9 +37,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     _LOGGER.info("Configuration: %s", conf)
     hass.data[DOMAIN] = conf
 
-    # Initialize other services
-    await async_setup_tagging_service(hass)
-    await async_setup_lyrics_service(hass)
+    # This is now done in async_setup_entry
+    #await async_setup_tagging_service(hass)
+    #await async_setup_lyrics_service(hass)
 
     return True
 
