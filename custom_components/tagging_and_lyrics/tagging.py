@@ -102,6 +102,10 @@ class TaggingService:
             wf.writeframes(b"".join(frames))
 
 
+    def recognize_audio(self, filename):
+        return self.recognizer.recognize_by_file(filename, 0, 10)
+
+
     async def listen_for_audio(self, duration):
         """Listen for UDP audio data for the specified duration."""
         try:
@@ -149,9 +153,9 @@ class TaggingService:
                 #self.hass.states.set("sensor.tagging_result", summary)
             except Exception as e:
                 _LOGGER.error("Error in Tagging Service: %s", e)
-                self.hass.states.set("sensor.tagging_result", "No match")
+                await asyncio.to_thread(self.hass.states.set("sensor.tagging_result", "No match"))
             finally:
-                self.hass.states.set("switch.tag_enable", "off") #Needed??
+                await asyncio.to_thread(self.hass.states.set("switch.tag_enable", "off")) #Needed??
 
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
