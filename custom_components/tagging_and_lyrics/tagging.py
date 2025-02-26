@@ -154,11 +154,9 @@ class TaggingService:
                 #self.hass.states.set("sensor.tagging_result", summary)
             except Exception as e:
                 _LOGGER.error("Error in Tagging Service: %s", e)
-                #await asyncio.to_thread(self.hass.states.set("sensor.tagging_result", "No match"))
-                self.hass.states.async_set("sensor.tagging_result", "No match")
+                await asyncio.to_thread(self.hass.states.set("sensor.tagging_result", "No match"))
             finally:
-                #await asyncio.to_thread(self.hass.states.set("switch.tag_enable", "off")) #Needed??
-                self.hass.states.async_set("switch.tag_enable", "off")
+                await asyncio.to_thread(self.hass.states.set("switch.tag_enable", "off")) #Needed??
 
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
