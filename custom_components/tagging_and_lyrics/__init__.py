@@ -57,6 +57,6 @@ async def async_setup_entry(hass, entry):
     await async_setup_lyrics_service(hass)
 
     # Load the platform for tagging_and_lyrics
-    hass.config_entries.async_setup_platforms(entry, ["tagging_and_lyrics"])
+    await hass.config_entries.async_forward_entry_setup(entry, "media_player")
 
     return True
