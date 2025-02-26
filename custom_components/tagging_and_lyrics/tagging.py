@@ -3,10 +3,8 @@ import logging
 import socket
 import time
 import datetime
-import io
 import re
 import wave
-import threading
 import voluptuous as vol
 import asyncio
 from homeassistant.core import HomeAssistant, ServiceCall
