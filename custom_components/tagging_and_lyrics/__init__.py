@@ -52,7 +52,11 @@ async def async_setup_entry(hass, entry):
 
     # Initialize hass.data[DOMAIN] here
     hass.data[DOMAIN] = entry.data
-    
+
     await async_setup_tagging_service(hass)
     await async_setup_lyrics_service(hass)
+
+    # Load the platform for tagging_and_lyrics
+    hass.config_entries.async_setup_platforms(entry, ["tagging_and_lyrics"])
+
     return True
