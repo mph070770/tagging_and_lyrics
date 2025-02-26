@@ -241,15 +241,16 @@ async def async_setup_tagging_service(hass: HomeAssistant):
 
     # Inside TaggingService.listen_for_audio() after successful tagging:
     conf = hass.data["tagging_and_lyrics"]
-    if conf['lyrics_enable']:
+    #if conf['lyrics_enable']:
+    if True:
         _LOGGER.info("Lyrics lookup enabled. Setting up lyrics lookup trigger.")
         async def tagging_service_lyrics_call(title, artist, play_offset_ms):
             process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
             _LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist)
             await trigger_lyrics_lookup(hass, title, artist, play_offset_ms, process_begin.isoformat())
         hass.data['tagging_service_lyrics_call'] = tagging_service_lyrics_call
-    else:
-        _LOGGER.info("Lyrics lookup disabled.")
+    #else:
+    #    _LOGGER.info("Lyrics lookup disabled.")
 
     async def async_wrapper(call):
         await handle_fetch_audio_tag(hass, call)
