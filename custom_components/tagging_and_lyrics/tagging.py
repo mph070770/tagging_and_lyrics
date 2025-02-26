@@ -127,10 +127,11 @@ class TaggingService:
 
                 # Short summary for sensor (title, artist, playtime)
                 summary = f"{title} - {artist_name} ({play_time})"
-                if self.hass:
-                    await self.hass.states.async_set("sensor.tagging_result", summary)
-                else:
-                    _LOGGER.error("Home Assistant instance is None. Cannot set state.") #MH - not sure about this as the fix??
+                self.hass.states.async_set("sensor.tagging_result", summary)
+                #if self.hass:
+                #    await self.hass.states.async_set("sensor.tagging_result", summary)
+                #else:
+                #    _LOGGER.error("Home Assistant instance is None. Cannot set state.") #MH - not sure about this as the fix??
 
 
                 # Full response stored in a persistent notification
@@ -149,11 +150,11 @@ class TaggingService:
 
             else:
                 message = "No music recognized."
-                #await self.hass.states.async_set("sensor.tagging_result", "No match")
-                if self.hass:
-                    await self.hass.states.async_set("sensor.tagging_result", "No match")
-                else:
-                    _LOGGER.error("Home Assistant instance is None. Cannot set state.")
+                self.hass.states.async_set("sensor.tagging_result", "No match")
+                #if self.hass:
+                #    await self.hass.states.async_set("sensor.tagging_result", "No match")
+                #else:
+                #    _LOGGER.error("Home Assistant instance is None. Cannot set state.")
 
             await update_lyrics_input_text(self.hass, "", "", "")
 
@@ -179,11 +180,11 @@ class TaggingService:
         except Exception as e:
             _LOGGER.error("Error in Tagging Service: %s", e)
             # Ensure switch is turned off in case of an error
-            #await self.hass.states.async_set("switch.tag_enable", "off")
-            if self.hass:
-                await self.hass.states.async_set("switch.tag_enable", "off")
-            else:
-                _LOGGER.error("Home Assistant instance is None. Cannot set state.")
+            self.hass.states.async_set("switch.tag_enable", "off")
+            #if self.hass:
+            #    await self.hass.states.async_set("switch.tag_enable", "off")
+            #else:
+            #    _LOGGER.error("Home Assistant instance is None. Cannot set state.")
 
     def stop(self):
         """Stop the tagging service."""
