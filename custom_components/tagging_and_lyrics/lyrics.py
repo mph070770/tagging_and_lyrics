@@ -7,6 +7,7 @@ import lrc_kit
 import time
 import re
 import asyncio
+import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -213,8 +214,10 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     provider = lrc_kit.ComboLyricsProvider(lyrics_provider)
 
     _LOGGER.info("Searching for lyrics.")
-    search_request = lrc_kit.SearchRequest(artist, track)
-    lyrics_result = provider.search(search_request)
+    #search_request = lrc_kit.SearchRequest(artist, track)
+    search_request = await hass.async_add_executor_job(lrc_kit.SearchRequest, artist, track)
+    #lyrics_result = provider.search(search_request)
+    lyrics_result = await hass.async_add_executor_job(provider.search, search_request)
 
     if not lyrics_result:
         _LOGGER.warning("No lyrics found for '%s'.", track)
