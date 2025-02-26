@@ -3,16 +3,18 @@ import logging
 import socket
 import time
 import datetime
+import io
 import re
 import wave
+import threading
 import voluptuous as vol
 import asyncio
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.entity_registry import async_get
 from acrcloud.recognizer import ACRCloudRecognizer, ACRCloudRecognizeType
 # Import trigger function from lyrics.py
 from .lyrics import trigger_lyrics_lookup, update_lyrics_input_text
-from .const import CONF_LYRICS_ENABLE
 
 # Define whether lyrics lookup should be enabled after tagging
 ENABLE_LYRICS_LOOKUP = True  # Change to False if you don't want automatic lyrics lookup
@@ -197,10 +199,9 @@ class TaggingService:
             # Inside TaggingService.listen_for_audio() after successful tagging:
             if ENABLE_LYRICS_LOOKUP:
                 if title and artist_name:
-                   #process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
-                   #_LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist_name)
-                   #await trigger_lyrics_lookup(self.hass, title, artist_name, play_offset_ms, process_begin.isoformat())
-                   await self.hass.data['tagging_service_lyrics_call'](title, artist_name, play_offset_ms)
+                    process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
+                    _LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist_name)
+                    await trigger_lyrics_lookup(self.hass, title, artist_name, play_offset_ms, process_begin.isoformat())
 
 
         except Exception as e:
@@ -236,24 +237,6 @@ async def async_setup_tagging_service(hass: HomeAssistant):
     """Register the fetch_audio_tag service in Home Assistant."""
     _LOGGER.info("Registering the fetch_audio_tag service.")
 
-    # Inside TaggingService.listen_for_audio() after successful tagging:
-    conf = hass.data["tagging_and_lyrics"]
-    if conf.get(CONF_LYRICS_ENABLE, True):
-        _LOGGER.info("Lyrics lookup enabled. Setting up lyrics lookup trigger.")
-        async def tagging_service_lyrics_call(title, artist, play_offset_ms):
-            process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
-            _LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist)
-            await trigger_lyrics_lookup(hass, title, artist, play_offset_ms, process_begin.isoformat())
-        hass.data['tagging_service_lyrics_call'] = tagging_service_lyrics_call
-    else:
-        _LOGGER.info("Lyrics lookup disabled.")
-    
-    return True
-    
-async def async_setup_entry(hass, entry):
-    _LOGGER.info("async setup entry: %s", entry)
-    """Set up platform from a ConfigEntry."""
-
     async def async_wrapper(call):
         await handle_fetch_audio_tag(hass, call)
 
@@ -265,5 +248,3 @@ async def async_setup_entry(hass, entry):
     )
 
     _LOGGER.info("fetch_audio_tag service registered successfully.")
-    return True
-
