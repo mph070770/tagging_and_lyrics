@@ -49,7 +49,10 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 async def async_setup_entry(hass, entry):
     _LOGGER.info("async setup entry: %s", entry)
     """Set up platform from a ConfigEntry."""
-    # Create a new entry object, this way we can add/remove options from the entry later on
+
+    # Initialize hass.data[DOMAIN] here
+    hass.data[DOMAIN] = entry.data
+    
     await async_setup_tagging_service(hass)
     await async_setup_lyrics_service(hass)
     return True
