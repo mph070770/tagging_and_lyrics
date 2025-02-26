@@ -33,7 +33,10 @@ CONFIG_SCHEMA = vol.Schema(
 async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     """Set up the component."""
     # Store the config in hass.data
-    conf = config[DOMAIN]
+    conf = config.get(DOMAIN) #Changed
+    if not conf:
+        return True
+    
     _LOGGER.info("Configuration: %s", conf)
     hass.data[DOMAIN] = conf
 
