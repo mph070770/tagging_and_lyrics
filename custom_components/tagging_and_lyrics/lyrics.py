@@ -356,7 +356,7 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
         _LOGGER.warning("Stopping current lyrics session for new request.")
         ACTIVE_LYRICS_LOOP = False
 
-    def monitor_playback(entity, old_state, new_state):
+    async def monitor_playback(entity, old_state, new_state):
         """Monitor media player state changes."""
         global LAST_MEDIA_CONTENT_ID
         global ACTIVE_LYRICS_LOOP
@@ -401,7 +401,8 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
                     LAST_MEDIA_CONTENT_ID = media_content_id
                     #fetch_lyrics_for_track(hass, track, artist, pos, updated_at, entity, False)
                     #await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False) #Pos wasn't updated at the same time as media_content_id??
-                    hass.async_create_task(fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False))
+                    #hass.async_create_task(fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False))
+                    await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False)
             else:
                 _LOGGER.info("Track already processed. Skipping lyrics fetch.")
         else:
