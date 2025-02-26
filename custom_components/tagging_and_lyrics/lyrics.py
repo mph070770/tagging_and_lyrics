@@ -118,7 +118,7 @@ def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, play_off
      # Get the configured media player entity ID
     media_player = hass.data["tagging_and_lyrics"]["media_player"]
 
-    fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
+    await fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
 
 def get_media_player_info(hass: HomeAssistant, entity_id: str):
     """Retrieve track, artist, media position, and last update time from media player."""
@@ -359,12 +359,12 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
 
         _LOGGER.debug("Media player state changed: %s -> %s", old_state.state if old_state else "None", new_state.state)
 
-        _LOGGER.info("***************************************************************")
-        _LOGGER.info("Entity ID from call data: %s", entity)
+        #_LOGGER.info("***************************************************************")
+        #_LOGGER.info("Entity ID from call data: %s", entity)
         media_content_id = hass.states.get(entity).attributes.get("media_content_id", "")
-        _LOGGER.info("fetch_lyrics service called for entity: %s", entity)
+        #_LOGGER.info("fetch_lyrics service called for entity: %s", entity)
         _LOGGER.info(">>>media_content_id: %s", media_content_id)
-        _LOGGER.info("***************************************************************")
+        #_LOGGER.info("***************************************************************")
 
         #_LOGGER.info("Entity ID: old:%s new:%s", old_state.entity_id, new_state.entity_id)
         #_LOGGER.info("State: old:%s new:%s", old_state.state, new_state.state)
@@ -396,7 +396,7 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
                     _LOGGER.debug("Fetching>>>>>>>>>>")
                     LAST_MEDIA_CONTENT_ID = media_content_id
                     #fetch_lyrics_for_track(hass, track, artist, pos, updated_at, entity, False)
-                    fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False) #Pos wasn't updated at the same time as media_content_id??
+                    await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False) #Pos wasn't updated at the same time as media_content_id??
             else:
                 _LOGGER.info("Track already processed. Skipping lyrics fetch.")
         else:
