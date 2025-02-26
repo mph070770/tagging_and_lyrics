@@ -1,3 +1,4 @@
+import json
 import logging
 import socket
 import time
@@ -72,49 +73,94 @@ class TaggingService:
         }
         self.recognizer = ACRCloudRecognizer(self.config)
 
+    async def receive_udp_data(self, duration):
+        """Non-blocking UDP data reception using asyncio."""
+        loop = asyncio.get_running_loop()
+        data_buffer = []
+
+        def socket_recv():
+            try:
+                return self.sock.recvfrom(CHUNK_SIZE)
+            except Exception as e:
+                _LOGGER.error("Socket error: %s", e)
+                return None, None
+
+        start_time = time.time()
+        while time.time() - start_time < duration:
+            **data, addr = await asyncio.to_thread(socket_recv)**
+            if data:
+                data_buffer.append(data)
+            await asyncio.sleep(0.01)  # Yield control to the event loop
+
+        return data_buffer
+    
+    def write_audio_file(self, filename, frames):
+        with wave.open(filename, "wb") as wf:
+            wf.setnchannels(CHANNELS)
+            wf.setsampwidth(SAMPLE_WIDTH)
+            wf.setframerate(SAMPLE_RATE)
+            wf.writeframes(b"".join(frames))
+
+
     async def listen_for_audio(self, duration):
         """Listen for UDP audio data for the specified duration."""
         try:
             _LOGGER.info("Waiting for incoming UDP audio data...")
 
             await self.hass.services.async_call("switch", "turn_on", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
+    
+            #data, addr = self.sock.recvfrom(CHUNK_SIZE)
 
-            data, addr = self.sock.recvfrom(CHUNK_SIZE)
+            buffer = await self.receive_udp_data(duration)
+
             _LOGGER.info("Audio detected, starting recording for %d seconds...", duration)
+            
             await update_lyrics_input_text(self.hass, "Listening......", "", "")
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
 
-            start_time = time.time()
-            buffer = []
+            #start_time = time.time()
+            #buffer = []
 
-            while time.time() - start_time < duration:
-                buffer.append(data)
-                data, addr = self.sock.recvfrom(CHUNK_SIZE)
+            #while time.time() - start_time < duration:
+            #    buffer.append(data)
+            #    data, addr = self.sock.recvfrom(CHUNK_SIZE)
 
-            _LOGGER.info("Recording complete. Sending to ACRCloud...")
+            
 
             # Convert buffer to WAV file
             wav_filename = "recorded_audio.wav"
+            await asyncio.to_thread(self.write_audio_file, wav_filename, buffer)
+            _LOGGER.info("Recording complete. Sending to ACRCloud...")
             #with wave.open(wav_filename, "wb") as wf:
-            wf = await asyncio.to_thread(wave.open, wav_filename, "wb")
-            with wf:
-                wf.setnchannels(CHANNELS)
-                wf.setsampwidth(SAMPLE_WIDTH)
-                wf.setframerate(SAMPLE_RATE)
-                wf.writeframes(b"".join(buffer))
+            #wf = await asyncio.to_thread(wave.open, wav_filename, "wb")
+            #with wf:
+            #    wf.setnchannels(CHANNELS)
+            #    wf.setsampwidth(SAMPLE_WIDTH)
+            #    wf.setframerate(SAMPLE_RATE)
+            #    wf.writeframes(b"".join(buffer))
 
             # Disable the tagging switch after WAV file creation
             await self.hass.services.async_call("switch", "turn_off", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
 
+            try:
+                response = await asyncio.to_thread(self.recognize_audio, wav_filename)
+                _LOGGER.info("ACRCloud Response: %s", response)
+                #summary = self.parse_acrcloud_response(response)
+                #self.hass.states.set("sensor.tagging_result", summary)
+            except Exception as e:
+                _LOGGER.error("Error in Tagging Service: %s", e)
+                self.hass.states.set("sensor.tagging_result", "No match")
+            finally:
+                self.hass.states.set("switch.tag_enable", "off") #Needed??
+
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
             #response = self.recognizer.recognize_by_file(wav_filename, 0, 10)
-            response = await asyncio.to_thread(self.recognizer.recognize_by_file, wav_filename, 0, 10)
-            await update_lyrics_input_text(self.hass, "Matching......", "", "")
-            _LOGGER.info("ACRCloud Response: %s", response)
+            #response = await asyncio.to_thread(self.recognizer.recognize_by_file, wav_filename, 0, 10)
+            #await update_lyrics_input_text(self.hass, "Matching......", "", "")
+            #_LOGGER.info("ACRCloud Response: %s", response)
 
             # Parse JSON response
-            import json
             response_data = json.loads(response)
 
             if "metadata" in response_data and "music" in response_data["metadata"]:
