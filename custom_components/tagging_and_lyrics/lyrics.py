@@ -104,7 +104,7 @@ def clean_track_name(track):
     # 6. Trim whitespace
     return track.strip()
 
-def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, play_offset_ms: int, process_begin: str):
+async def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, play_offset_ms: int, process_begin: str):
     """Trigger lyrics lookup based on a recognized song."""
 
     _LOGGER.info("Fetching lyrics for tagged song")
@@ -118,11 +118,11 @@ def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, play_off
      # Get the configured media player entity ID
     media_player = hass.data["tagging_and_lyrics"]["media_player"]
 
-    #fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
+    await fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
 
-    hass.async_create_task(
-        fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True)
-    )
+    #hass.async_create_task(
+    #    fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True)
+    #)
 
 def get_media_player_info(hass: HomeAssistant, entity_id: str):
     """Retrieve track, artist, media position, and last update time from media player."""
@@ -136,12 +136,12 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
     
     if not player_state:
         _LOGGER.error("Media player entity not found.")
-        update_lyrics_input_text(hass, "Media player entity not found", "", "")
+        await update_lyrics_input_text(hass, "Media player entity not found", "", "")
         return None, None, None, None  # Return empty values
 
     if player_state.state != "playing":
         _LOGGER.info("Media player is not playing. Waiting...")
-        update_lyrics_input_text(hass, "Waiting for playback to start", "", "")
+        await update_lyrics_input_text(hass, "Waiting for playback to start", "", "")
         return None, None, None, None
 
     track = clean_track_name(player_state.attributes.get("media_title", ""))
@@ -151,7 +151,7 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
 
     if not track or not artist:
         _LOGGER.warning("Missing track or artist information.")
-        update_lyrics_input_text(hass, "Missing track or artist", "", "")
+        await update_lyrics_input_text(hass, "Missing track or artist", "", "")
         return None, None, None, None
 
     return track, artist, pos, updated_at
@@ -390,7 +390,7 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
                 _LOGGER.info("ACTIVE_LYRICS_LOOP = False")
                 ACTIVE_LYRICS_LOOP = False
                 _LOGGER.info("New media detected. Fetching lyrics.")
-                update_lyrics_input_text(hass, "", "", "")
+                await update_lyrics_input_text(hass, "", "", "")
                 track, artist, pos, updated_at = get_media_player_info(hass, entity)
                 _LOGGER.info("********* artist %s, track %s, media_content_id %s *********", 
                             artist, track, media_content_id)
@@ -402,7 +402,7 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
                     #fetch_lyrics_for_track(hass, track, artist, pos, updated_at, entity, False)
                     #await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False) #Pos wasn't updated at the same time as media_content_id??
                     #hass.async_create_task(fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False))
-                    await fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False)
+                    hass.loop.call_soon_threadsafe(hass.async_create_task, fetch_lyrics_for_track(hass, track, artist, 0, updated_at, entity, False))
             else:
                 _LOGGER.info("Track already processed. Skipping lyrics fetch.")
         else:

@@ -173,7 +173,7 @@ class TaggingService:
                 if title and artist_name:
                     process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
                     _LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist_name)
-                    trigger_lyrics_lookup(self.hass, title, artist_name, play_offset_ms, process_begin.isoformat())
+                    await trigger_lyrics_lookup(self.hass, title, artist_name, play_offset_ms, process_begin.isoformat())
 
 
         except Exception as e:
