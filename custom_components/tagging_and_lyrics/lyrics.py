@@ -105,8 +105,10 @@ def clean_track_name(track):
     # 6. Trim whitespace
     return track.strip()
 
+
 async def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, play_offset_ms: int, process_begin: str):
     """Trigger lyrics lookup based on a recognized song."""
+    global ACTIVE_LYRICS_LOOP
 
     _LOGGER.info("Fetching lyrics for tagged song")
 
@@ -116,6 +118,8 @@ async def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, pl
 
     _LOGGER.info("Fetching lyrics for: %s - %s", title, artist)
 
+    # Get the configured media player entity ID
+    media_player = hass.data["tagging_and_lyrics"]["media_player"]
     if ACTIVE_LYRICS_LOOP is None:
         # No loop is currently active, start one
         ACTIVE_LYRICS_LOOP = "tagging"
@@ -125,20 +129,9 @@ async def trigger_lyrics_lookup(hass: HomeAssistant, title: str, artist: str, pl
         _LOGGER.info("Lyrics loop already active from tagging. Exiting.")
         return
     else:
-        #stop any other loop from running
-        _LOGGER.info("Lyrics loop already active from media player, stop tagging call, stop existing loop.")
-        ACTIVE_LYRICS_LOOP = None
+        _LOGGER.info("Lyrics loop already active from media player, exit tagging call.")
+        return
 
-        await fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True)
-
-     # Get the configured media player entity ID
-    ####media_player = hass.data["tagging_and_lyrics"]["media_player"]
-
-    ####await fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True) #fingerprinting is true
-
-    #hass.async_create_task(
-    #    fetch_lyrics_for_track(hass, title, artist, play_offset_ms/1000, process_begin, media_player, True)
-    #)
 
 def get_media_player_info(hass: HomeAssistant, entity_id: str):
     """Retrieve track, artist, media position, and last update time from media player."""
