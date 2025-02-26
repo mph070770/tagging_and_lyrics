@@ -102,7 +102,7 @@ class TaggingService:
             wf.writeframes(b"".join(frames))
 
 
-    def recognize_audio(self, filename):
+    async def recognize_audio(self, filename):
         return self.recognizer.recognize_by_file(filename, 0, 10)
 
 
@@ -147,15 +147,18 @@ class TaggingService:
             await self.hass.services.async_call("switch", "turn_off", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
 
             try:
-                response = await asyncio.to_thread(self.recognize_audio, wav_filename)
+                #response = await asyncio.to_thread(self.recognize_audio, wav_filename)
+                response = await self.recognize_audio(wav_filename)
                 _LOGGER.info("ACRCloud Response: %s", response)
                 #summary = self.parse_acrcloud_response(response)
                 #self.hass.states.set("sensor.tagging_result", summary)
             except Exception as e:
                 _LOGGER.error("Error in Tagging Service: %s", e)
-                await asyncio.to_thread(self.hass.states.set("sensor.tagging_result", "No match"))
+                #await asyncio.to_thread(self.hass.states.set("sensor.tagging_result", "No match"))
+                self.hass.states.async_set("sensor.tagging_result", "No match")
             finally:
-                await asyncio.to_thread(self.hass.states.set("switch.tag_enable", "off")) #Needed??
+                #await asyncio.to_thread(self.hass.states.set("switch.tag_enable", "off")) #Needed??
+                self.hass.states.async_set("switch.tag_enable", "off")
 
             # Send to ACRCloud
             #process_begin = datetime.datetime.now(datetime.timezone.utc)
