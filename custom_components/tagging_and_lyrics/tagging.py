@@ -103,7 +103,8 @@ class TaggingService:
 
 
     async def recognize_audio(self, filename):
-        return self.recognizer.recognize_by_file(filename, 0, 10)
+        #return self.recognizer.recognize_by_file(filename, 0, 10)
+        return await asyncio.to_thread(self.recognizer.recognize_by_file, filename, 0, 10)
 
 
     async def listen_for_audio(self, duration):
