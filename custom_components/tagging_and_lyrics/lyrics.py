@@ -314,10 +314,12 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
             await update_lyrics_input_text(hass, "", "", "")
         else:
             #not playing
-            if ACTIVE_LYRICS_LOOP is not None:
-                _LOGGER.info("Monitor Playback: Lyrics stopped (media player is not playing). Setting ACTIVE_LYRICS_LOOP = None")
-                await update_lyrics_input_text(hass, "", "", "")
-            ACTIVE_LYRICS_LOOP = None
+            #if ACTIVE_LYRICS_LOOP is not None:
+            #    _LOGGER.info("Monitor Playback: Lyrics stopped (media player is not playing). Setting ACTIVE_LYRICS_LOOP = None")
+            #    await update_lyrics_input_text(hass, "", "", "")
+            #ACTIVE_LYRICS_LOOP = None
+            await update_lyrics_input_text(hass, "", "", "")
+            _LOGGER.info("Monitor Playback: Media player is not playing - but do nothing about it.")
 
 
     # Register listener for state changes
