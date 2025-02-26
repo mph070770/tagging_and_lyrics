@@ -87,7 +87,7 @@ class TaggingService:
 
         start_time = time.time()
         while time.time() - start_time < duration:
-            **data, addr = await asyncio.to_thread(socket_recv)**
+            data, addr = await asyncio.to_thread(socket_recv)
             if data:
                 data_buffer.append(data)
             await asyncio.sleep(0.01)  # Yield control to the event loop
