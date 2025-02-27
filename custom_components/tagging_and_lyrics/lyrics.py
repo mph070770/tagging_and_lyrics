@@ -161,7 +161,7 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     # Ensure they are valid
     if pos is None or updated_at is None:
         _LOGGER.error("Fetch: pos or updated_at is not initialized. Exiting lyrics sync. Setting KILL_LYRICS")
-        ACTIVE_LYRICS_LOOP = None # not sure why it's not clearing.  Force it cleared and see what happens :-)
+        ACTIVE_LYRICS_LOOP = None 
         KILL_LYRICS = True
 
     # Check if the switch is enabled
@@ -185,7 +185,9 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
             if elapsed >= timeout:
                 _LOGGER.info("Timeout: Lyrics session did not terminate within 5 seconds.")
                 _LOGGER.info("KILL_LYRICS: %s, ACTIVE_LOOP_LYRICS: %s", KILL_LYRICS, ACTIVE_LYRICS_LOOP)
-                return
+                #return
+                ACTIVE_LYRICS_LOOP = None # not sure why it's not clearing.  Force it cleared and see what happens :-)
+                _LOGGER.info("KILL_LYRICS - forced: %s, ACTIVE_LOOP_LYRICS: %s", KILL_LYRICS, ACTIVE_LYRICS_LOOP)
             await asyncio.sleep(interval)
             elapsed += interval
 
