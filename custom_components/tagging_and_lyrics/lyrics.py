@@ -14,6 +14,7 @@ _LOGGER = logging.getLogger(__name__)
 # Global variable to store last processed media content ID
 LAST_MEDIA_CONTENT_ID = None
 ACTIVE_LYRICS_LOOP = None  # mananges the situation where new lyrics are requested when some are still playing - important for radio streams where tracks get cut short
+KILL_LYRICS = False
 
 SERVICE_FETCH_LYRICS_SCHEMA = vol.Schema({
     vol.Required("entity_id"): cv.entity_id
@@ -151,15 +152,17 @@ def get_media_player_info(hass: HomeAssistant, entity_id: str):
 
 async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, pos, updated_at, entity_id, audiofingerprint):
     """Fetch lyrics for a given track and synchronize with playback."""
-    global ACTIVE_LYRICS_LOOP  
+    global ACTIVE_LYRICS_LOOP
+    global KILL_LYRICS
 
     _LOGGER.info("Fetch: Fetching lyrics for: %s %s", artist, track)
     _LOGGER.info("Fetch: pos=%s, updated_at=%s", pos, updated_at)
 
     # Ensure they are valid
     if pos is None or updated_at is None:
-        _LOGGER.error("Fetch: pos or updated_at is not initialized. Exiting lyrics sync.")
-        ACTIVE_LYRICS_LOOP = None
+        _LOGGER.error("Fetch: pos or updated_at is not initialized. Exiting lyrics sync. Setting KILL_LYRICS")
+        #ACTIVE_LYRICS_LOOP = None
+        KILL_LYRICS = True
         return
 
     # Check if the switch is enabled
@@ -173,6 +176,14 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     _LOGGER.info("Fetch: Start new session")
     await update_lyrics_input_text(hass, "", "", "")
     # Start new session
+
+    if KILL_LYRICS:  # Wait until any current lyrics session is terminated
+        try:
+            await asyncio.wait_for(asyncio.sleep_until(lambda: not ACTIVE_LYRICS_LOOP), timeout=5)
+        except asyncio.TimeoutError:
+            raise RuntimeError("Timeout: Lyrics session did not terminate within 5 seconds.")
+    KILL_LYRICS = False
+
     _LOGGER.info("Fetch: ACTIVE_LYRICS_LOOP = **TRUE**.")
     ACTIVE_LYRICS_LOOP = True
     timeline = []
@@ -230,8 +241,10 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
         media_timecode = calculate_media_timecode(pos, updated_at)
 
         if media_timecode * 1000 >= timeline[-1]:  # Exit if lyrics finished
-            _LOGGER.info("Fetch: Lyrics finished, exiting loop.")
+            _LOGGER.info("Fetch: Lyrics finished, ***EXITING ACTIVE_LYRICS_LOOP***")
             await update_lyrics_input_text(hass, "", "", "")
+            ACTIVE_LYRICS_LOOP = None
+            KILL_LYRICS = False
             break
 
         # Display synchronized lyrics
@@ -249,9 +262,12 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
                     interval = 0.1  # Check every 0.1 seconds
 
                     while total_sleep > 0:
-                        if not ACTIVE_LYRICS_LOOP:  # Check if loop should exit
+                        #if not ACTIVE_LYRICS_LOOP:  # Check if loop should exit
+                        if KILL_LYRICS == True:
                             _LOGGER.info("Fetch: Lyrics loop interrupted (set to None), exiting sleep.")
                             await update_lyrics_input_text(hass, "", "", "")
+                            ACTIVE_LYRICS_LOOP = None
+                            KILL_LYRICS = False
                             break  # Exit the async function immediately
                         
                         #time.sleep(min(interval, total_sleep))  # Sleep for interval or remaining time
@@ -263,7 +279,8 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     
     # Reset ACTIVE_LYRICS_LOOP to None when loop exits
     _LOGGER.info("Fetch: ACTIVE_LYRICS_LOOP = None.")
-    ACTIVE_LYRICS_LOOP = None  
+    ACTIVE_LYRICS_LOOP = None
+
 
 
 def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
@@ -272,14 +289,19 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
     
     # Stop any current session cleanly
     global ACTIVE_LYRICS_LOOP
+    global KILL_LYRICS
+
     if ACTIVE_LYRICS_LOOP:
-        _LOGGER.warning("Handle Fetch Lyrics:Stopping current lyrics session for new request. Setting ACTIVE_LYRICS_LOOP = None.")
-        ACTIVE_LYRICS_LOOP = None
+        #_LOGGER.warning("Handle Fetch Lyrics:Stopping current lyrics session for new request. Setting ACTIVE_LYRICS_LOOP = None.")
+        _LOGGER.warning("Handle Fetch Lyrics:Stopping current lyrics session for new request. Setting KILL_LYRICS")
+        #ACTIVE_LYRICS_LOOP = None
+        KILL_LYRICS = True
 
     async def monitor_playback(entity, old_state, new_state):
         """Monitor media player state changes."""
         global LAST_MEDIA_CONTENT_ID
         global ACTIVE_LYRICS_LOOP
+        global KILL_LYRICS
 
         _LOGGER.debug("Monitor Playback: Media player state changed: %s -> %s", old_state.state if old_state else "None", new_state.state)
 
@@ -293,8 +315,10 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
 
             # Check if the media_content_id is different from the last one processed
             if media_content_id and media_content_id != LAST_MEDIA_CONTENT_ID:
-                _LOGGER.info("Monitor Playback: Content has changed, not a radio station. Setting ACTIVE_LYRICS_LOOP = None")
-                ACTIVE_LYRICS_LOOP = None # changed from False
+                #_LOGGER.info("Monitor Playback: Content has changed, not a radio station. Setting ACTIVE_LYRICS_LOOP = None")
+                _LOGGER.info("Monitor Playback: Content has changed, not a radio station. Setting KILL_LYRICS")
+                #ACTIVE_LYRICS_LOOP = None # changed from False
+                KILL_LYRICS = True
                 await update_lyrics_input_text(hass, "", "", "")
                 track, artist, pos, updated_at = get_media_player_info(hass, entity)
                 _LOGGER.info("Monitor Playback: New Info -> Artist %s, Track %s, media_content_id %s", artist, track, media_content_id)
@@ -309,8 +333,10 @@ def handle_fetch_lyrics(hass: HomeAssistant, call: ServiceCall):
         #Playing, radio
         elif new_state.state=="playing" and media_content_id.startswith("library://radio"):
             LAST_MEDIA_CONTENT_ID = media_content_id #it's a radio station so capture the change of stream but don't fetch lyrics
-            _LOGGER.info("Monitor Playback: Radio station detected.  Setting ACTIVE_LYRICS_LOOP = None")
-            ACTIVE_LYRICS_LOOP = None
+            #_LOGGER.info("Monitor Playback: Radio station detected.  Setting ACTIVE_LYRICS_LOOP = None")
+            _LOGGER.info("Monitor Playback: Radio station detected.  Setting KILL_LYRICS")
+            #ACTIVE_LYRICS_LOOP = None
+            KILL_LYRICS = True
             await update_lyrics_input_text(hass, "", "", "")
         else:
             #not playing
