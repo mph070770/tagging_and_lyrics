@@ -161,9 +161,8 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     # Ensure they are valid
     if pos is None or updated_at is None:
         _LOGGER.error("Fetch: pos or updated_at is not initialized. Exiting lyrics sync. Setting KILL_LYRICS")
-        #ACTIVE_LYRICS_LOOP = None
+        ACTIVE_LYRICS_LOOP = None # not sure why it's not clearing.  Force it cleared and see what happens :-)
         KILL_LYRICS = True
-        return
 
     # Check if the switch is enabled
     if not hass.states.is_state("input_boolean.lyrics_enable", "on"):
