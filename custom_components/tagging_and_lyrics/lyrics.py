@@ -177,12 +177,17 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     await update_lyrics_input_text(hass, "", "", "")
     # Start new session
 
+    timeout = 5
+    interval = 0.1
+    elapsed = 0
+
     if KILL_LYRICS:
         while ACTIVE_LYRICS_LOOP:
-            if elapsed >= 5:
-                raise RuntimeError("Timeout: Old lyrics session did not terminate within 5 seconds.")
-            await asyncio.sleep(0.1)
-            elapsed += 0.1
+            if elapsed >= timeout:
+                raise RuntimeError("Timeout: Lyrics session did not terminate within 5 seconds.")
+            await asyncio.sleep(interval)
+            elapsed += interval
+
     KILL_LYRICS = False
 
     _LOGGER.info("Fetch: ACTIVE_LYRICS_LOOP = **TRUE**.")
