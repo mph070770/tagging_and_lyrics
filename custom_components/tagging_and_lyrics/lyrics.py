@@ -184,7 +184,8 @@ async def fetch_lyrics_for_track(hass: HomeAssistant, track: str, artist: str, p
     if KILL_LYRICS:
         while ACTIVE_LYRICS_LOOP:
             if elapsed >= timeout:
-                raise RuntimeError("Timeout: Lyrics session did not terminate within 5 seconds.")
+                _LOGGER.info("Timeout: Lyrics session did not terminate within 5 seconds.")
+                _LOGGER.info("KILL_LYRICS: %s, ACTIVE_LOOP_LYRICS: %s", KILL_LYRICS, ACTIVE_LYRICS_LOOP)
             await asyncio.sleep(interval)
             elapsed += interval
 
