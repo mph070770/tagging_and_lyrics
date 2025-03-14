@@ -4,6 +4,9 @@ fetch_audio_tag:
     duration:
       description: "Recording duration in seconds."
       example: 10
+    include_lyrics:
+      description: "True if after identifying the track, lyrics should also be fetched"
+      example: True
 
 fetch_lyrics:
   description: "Fetch lyrics for the currently playing track."

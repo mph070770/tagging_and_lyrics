@@ -24,20 +24,24 @@ _LOGGER = logging.getLogger(__name__)
 
 # Constants
 UDP_PORT = 6056
-BUFFER_TIME = 10  # Default seconds
-SAMPLE_RATE = 16000
 CHUNK_SIZE = 4096
+SAMPLE_RATE = 16000
 CHANNELS = 1
 SAMPLE_WIDTH = 2
 
+# New constants for modified approach
+CHUNK_DURATION = 3  # Duration of each audio chunk in seconds
+MAX_TOTAL_DURATION = 12  # Maximum total recording time in seconds
+
 # Service Schema
 SERVICE_FETCH_AUDIO_TAG_SCHEMA = vol.Schema({
-    vol.Optional("duration", default=10): vol.All(vol.Coerce(int), vol.Range(min=1, max=60))
+    vol.Optional("duration", default=MAX_TOTAL_DURATION): vol.All(vol.Coerce(int), vol.Range(min=1, max=60)),
+    vol.Optional("include_lyrics", default=True): vol.All(vol.Coerce(bool))
 })
 
 def clean_text(text):
-        """Remove Chinese characters from the given text."""
-        return re.sub(r'[\u4e00-\u9fff]+', '', text).strip()
+    """Remove Chinese characters from the given text."""
+    return re.sub(r'[\u4e00-\u9fff]+', '', text).strip()
 
     
 def format_time(ms):
@@ -64,6 +68,8 @@ class TaggingService:
         self.sock.setblocking(False)  # Set to non-blocking
         self.running = True
 
+        _LOGGER.info("Set up UDP on port %d", conf["port"])
+
         self.config = {
             'host': conf["host"],
             'access_key': conf["access_key"],
@@ -78,7 +84,9 @@ class TaggingService:
         """Non-blocking UDP data reception using asyncio."""
         loop = asyncio.get_running_loop()
         data_buffer = []
-        
+
+        _LOGGER.info("Recording for %d seconds...", duration)
+
         start_time = time.time()
         while time.time() - start_time < duration:
             try:
@@ -105,110 +113,164 @@ class TaggingService:
         """Write audio data to a WAV file in a non-blocking way."""
         await asyncio.to_thread(self._write_audio_file, filename, frames)
 
-
     async def recognize_audio(self, filename):
-        #return self.recognizer.recognize_by_file(filename, 0, 10)
-        return await asyncio.to_thread(self.recognizer.recognize_by_file, filename, 0, 10)
+        """Recognize audio file using ACRCloud."""
+        return await asyncio.to_thread(self.recognizer.recognize_by_file, filename, 0, CHUNK_DURATION)
 
     def _set_state_in_loop(self, entity_id, state):
         """Set state in the Home Assistant event loop."""
         self.hass.states.async_set(entity_id, state)
 
-    async def listen_for_audio(self, duration):
-        """Listen for UDP audio data for the specified duration."""
+    async def process_audio_chunk(self, chunk_buffer, chunk_index):
+        """Process a single audio chunk."""
+        # Convert buffer to WAV file
+        wav_filename = f"recorded_audio_chunk_{chunk_index}.wav"
+        await self.write_audio_file(wav_filename, chunk_buffer)
+        _LOGGER.info(f"Chunk {chunk_index} recording complete. Sending to ACRCloud...")
+        
         try:
-            _LOGGER.info("Waiting for incoming UDP audio data...")
-
-            await self.hass.services.async_call("switch", "turn_on", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
-    
-            buffer = await self.receive_udp_data(duration)
-
-            _LOGGER.info("Audio detected, starting recording for %d seconds...", duration)
+            response = await self.recognize_audio(wav_filename)
+            _LOGGER.info(f"ACRCloud Response for chunk {chunk_index}: %s", response)
             
-            await update_lyrics_input_text(self.hass, "Listening......", "", "")
-
-            # Convert buffer to WAV file
-            wav_filename = "recorded_audio.wav"
-            await self.write_audio_file(wav_filename, buffer)
-            _LOGGER.info("Recording complete. Sending to ACRCloud...")
-           
-
-            # Disable the tagging switch after WAV file creation
-            await self.hass.services.async_call("switch", "turn_off", {"entity_id": "switch.home_assistant_mic_093d58_tagging_enable"})
-
-            try:
-                response = await self.recognize_audio(wav_filename)
-                _LOGGER.info("ACRCloud Response: %s", response)
-            except Exception as e:
-                _LOGGER.error("Error in Tagging Service: %s", e)
-                #self.hass.states.async_set("sensor.tagging_result", "No match")
-                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", "No match")
-            finally:
-                #self.hass.states.async_set("switch.tag_enable", "off") #Needed??
-                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "switch.tag_enable", "off")
-
             # Parse JSON response
             response_data = json.loads(response)
-
-            if "metadata" in response_data and "music" in response_data["metadata"]:
-                first_match = response_data["metadata"]["music"][0]  # Get the first match
+            
+            # Check if we have a successful match
+            if ("status" in response_data and 
+                response_data["status"].get("msg") == "Success" and 
+                "metadata" in response_data and 
+                "music" in response_data["metadata"]):
                 
-                artist_name = clean_text(first_match["artists"][0]["name"]) if "artists" in first_match else "Unknown Artist"
-                title = clean_text(first_match.get("title", "Unknown Title"))
-                play_offset_ms = first_match.get("play_offset_ms", 0)
-                play_time = format_time(play_offset_ms)
+                return response_data, True  # Return data and success flag
+            
+            return response_data, False  # Return data but not successful
+            
+        except Exception as e:
+            _LOGGER.error(f"Error recognizing chunk {chunk_index}: %s", e)
+            return None, False
 
-                # Short summary for sensor (title, artist, playtime)
-                summary = f"{title} - {artist_name} ({play_time})"
-                #self.hass.states.async_set("sensor.tagging_result", summary)
-                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", summary)
+    async def handle_successful_match(self, response_data, include_lyrics):
+        """Handle a successful match from ACRCloud."""
+        first_match = response_data["metadata"]["music"][0]  # Get the first match
+        
+        artist_name = clean_text(first_match["artists"][0]["name"]) if "artists" in first_match else "Unknown Artist"
+        title = clean_text(first_match.get("title", "Unknown Title"))
+        play_offset_ms = first_match.get("play_offset_ms", 0)
+        play_time = format_time(play_offset_ms)
 
+        # Short summary for sensor (title, artist, playtime)
+        summary = f"{title} - {artist_name} ({play_time})"
+        self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", summary)
 
-                # Full response stored in a persistent notification
+        # Full response stored in a persistent notification
+        await self.hass.services.async_call(
+            "persistent_notification",
+            "create",
+            {
+                "title": "Audio Tagging Full Result",
+                "message": f"```json\n{json.dumps(response_data, indent=2)}\n```",
+                "notification_id": "tagging_full_result"
+            }
+        )
+
+        # Formatted response for the main notification
+        message = f"🎵 **Title**: {title}\n👤 **Artist**: {artist_name}\n⏱️ **Play Offset**: {play_time} (MM:SS)"
+
+        await update_lyrics_input_text(self.hass, "", "", "")
+
+        # Create a persistent notification with the formatted response
+        await self.hass.services.async_call(
+            "persistent_notification",
+            "create",
+            {
+                "title": "Audio Tagging Result",
+                "message": message,
+                "notification_id": "tagging_result"
+            }
+        )
+
+        # Trigger lyrics lookup if enabled
+        if ENABLE_LYRICS_LOOKUP and include_lyrics:
+            if title and artist_name:
+                process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
+                _LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist_name)
+                await trigger_lyrics_lookup(self.hass, title, artist_name, play_offset_ms, process_begin.isoformat())
+
+    async def listen_for_audio(self, max_duration, include_lyrics):
+        """Listen for UDP audio data in chunks until successful recognition or timeout."""
+        try:
+            _LOGGER.info("Waiting for incoming UDP audio data...")
+            await update_lyrics_input_text(self.hass, "Listening......", "", "")
+            
+            # Turn on the tagging switch
+            await self.hass.services.async_call(
+                "switch", 
+                "turn_on", 
+                {"entity_id": "switch.home_assistant_voice_093d58_tagging_enable"}
+            )
+            
+            total_chunks = max_duration // CHUNK_DURATION
+            all_audio_data = []
+            success = False
+            successful_response = None
+            
+            for i in range(total_chunks):
+                _LOGGER.info(f"Recording chunk {i+1}/{total_chunks} ({CHUNK_DURATION} seconds)...")
+                
+                # Collect audio data for this chunk
+                chunk_buffer = await self.receive_udp_data(CHUNK_DURATION)
+                all_audio_data.extend(chunk_buffer)
+                
+                # Process this chunk
+                response_data, is_success = await self.process_audio_chunk(chunk_buffer, i+1)
+                
+                if is_success:
+                    _LOGGER.info(f"Successfully recognized audio in chunk {i+1}")
+                    success = True
+                    successful_response = response_data
+                    break
+                else:
+                    _LOGGER.info(f"No match in chunk {i+1}, continuing...")
+            
+            # Turn off the tagging switch
+            await self.hass.services.async_call(
+                "switch", 
+                "turn_off", 
+                {"entity_id": "switch.home_assistant_voice_093d58_tagging_enable"}
+            )
+            
+            # Handle results
+            if success:
+                await self.handle_successful_match(successful_response, include_lyrics)
+            else:
+                _LOGGER.info("No music recognized in any chunk.")
+                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", "No match")
+                
+                # Create a notification for no match
                 await self.hass.services.async_call(
                     "persistent_notification",
                     "create",
                     {
-                        "title": "Audio Tagging Full Result",
-                        "message": f"```json\n{response}\n```",
-                        "notification_id": "tagging_full_result"
+                        "title": "Audio Tagging Result",
+                        "message": "No music recognized after trying all audio chunks.",
+                        "notification_id": "tagging_result"
                     }
                 )
-
-                # Formatted response for the main notification
-                message = f"🎵 **Title**: {title}\n👤 **Artist**: {artist_name}\n⏱️ **Play Offset**: {play_time} (MM:SS)"
-
-            else:
-                message = "No music recognized."
-                #self.hass.states.async_set("sensor.tagging_result", "No match")
-                self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "sensor.tagging_result", "No match")
-
-            await update_lyrics_input_text(self.hass, "", "", "")
-
-            # Create a persistent notification with the formatted response
-            await self.hass.services.async_call(
-                "persistent_notification",
-                "create",
-                {
-                    "title": "Audio Tagging Result",
-                    "message": message,
-                    "notification_id": "tagging_result"
-                }
-            )
-
-            # Inside TaggingService.listen_for_audio() after successful tagging:
-            if ENABLE_LYRICS_LOOKUP:
-                if title and artist_name:
-                    process_begin = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(seconds=FINETUNE_SYNC)
-                    _LOGGER.info("Triggering lyrics lookup for: %s - %s", title, artist_name)
-                    await trigger_lyrics_lookup(self.hass, title, artist_name, play_offset_ms, process_begin.isoformat())
-
+                
+                await update_lyrics_input_text(self.hass, "", "", "")
+            
+            # Make sure switch is off
+            self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "switch.tag_enable", "off")
 
         except Exception as e:
             _LOGGER.error("Error in Tagging Service: %s", e)
             # Ensure switch is turned off in case of an error
-            #self.hass.states.async_set("switch.tag_enable", "off")
             self.hass.loop.call_soon_threadsafe(self._set_state_in_loop, "switch.tag_enable", "off")
+            await self.hass.services.async_call(
+                "switch", 
+                "turn_off", 
+                {"entity_id": "switch.home_assistant_voice_093d58_tagging_enable"}
+            )
 
     def stop(self):
         """Stop the tagging service."""
@@ -218,10 +280,12 @@ class TaggingService:
 
 async def handle_fetch_audio_tag(hass: HomeAssistant, call: ServiceCall):
     """Handle the service call for fetching audio tags."""
-    duration = call.data.get("duration", 10)
+    duration = call.data.get("duration", MAX_TOTAL_DURATION)
+    include_lyrics = call.data.get("include_lyrics", True)
 
-    _LOGGER.info("fetch_audio_tag service called. Recording duration: %s seconds", duration)
-
+    _LOGGER.info("fetch_audio_tag service called. Max recording duration: %s seconds, Lyrics requested: %s", 
+                duration, include_lyrics)
+    
     # Stop any running instance before starting a new one
     if "tagging_service" in hass.data:
         _LOGGER.info("Stopping existing tagging service before starting a new one.")
@@ -230,7 +294,7 @@ async def handle_fetch_audio_tag(hass: HomeAssistant, call: ServiceCall):
     tagging_service = TaggingService(hass)
     hass.data["tagging_service"] = tagging_service  # Store the instance
 
-    await tagging_service.listen_for_audio(duration)
+    await tagging_service.listen_for_audio(duration, include_lyrics)
 
 
 async def async_setup_tagging_service(hass: HomeAssistant):

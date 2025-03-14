@@ -93,6 +93,8 @@ def clean_track_name(track):
     track = re.sub(r'\bfrom\s+".+?"\s+soundtrack\b', '', track, flags=re.IGNORECASE)
     track = re.sub(r'\bfrom\s+.+?\s+soundtrack\b', '', track, flags=re.IGNORECASE)
     track = re.sub(r'\s+\(album version\)\b', '', track, flags=re.IGNORECASE)
+    track = re.sub(r'\s+\(single version\)\b', '', track, flags=re.IGNORECASE)
+    track = re.sub(r'\s+\(remaster\)\b', '', track, flags=re.IGNORECASE)
     track = re.sub(r'\s+\(radio edit\)\b', '', track, flags=re.IGNORECASE)
     track = re.sub(r'\s+\(remix\)\b', '', track, flags=re.IGNORECASE)
     track = re.sub(r'\s+\(edit\)\b', '', track, flags=re.IGNORECASE)
